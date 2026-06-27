@@ -161,3 +161,14 @@ README polish. (Requires a Claude Desktop restart to load all 5 tools + instruct
 
 **Next:** Phase 5b — data-rich status visual (Option A); 5c — README polish (CDS framing, NLM
 attribution, diagram); then finalize + demo.
+
+### Session 6 (cont.) — Phase 5b–c → v1 FEATURE-COMPLETE
+
+- **5b:** produced the data-rich status visual (Option A) — FDA status (color) × breadth (presentations
+  affected); LLM-rendered from live tool data, server stays data-only. FDA-aligned labels; dropped
+  "clean" and the unverified market-status claim.
+- **5c:** polished README — informatics-audience + CDS framing, the differentiator vs Orange-Book /
+  vendor tools, a concrete furosemide cascade Example + data table, surfaced the eval + safety gate,
+  real-shortage example query.
+- **v1 feature-complete:** 5 tools + orchestration + test-enforced safety gate; 21 offline tests +
+  live eval 15/15; public repo (17 commits). **Remaining:** Travis records the demo video → mark complete.
