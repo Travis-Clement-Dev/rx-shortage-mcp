@@ -126,3 +126,20 @@ bumetanide, piretanide, torsemide, furosemide.
 torsemide, furosemide]. The complete data chain (normalize→class→alternatives→shortage) now exists.
 
 **Next:** Phase 4 — orchestration docstrings tying the chain together + the test-enforced safety gate.
+
+### Session 5 — 2026-06-27 — Phase 4: orchestration + safety gate
+
+**Done (TDD red→green):**
+- Server-level `INSTRUCTIONS` (passed to `FastMCP(instructions=...)`) — the canonical place for the
+  full workflow (normalize→shortage→class→alternatives→cascade re-check→synthesize) + the safety &
+  grounding framing (decision-support only; never invent a drug; surface the disclaimer). Layered
+  above the per-tool `next_step` hints.
+- `tests/test_safety_gate.py` — mechanical gate: no substitution-instruction phrases in any tool
+  description OR the instructions; disclaimer content intact; `find_alternatives` always carries the
+  disclaimer (even for an empty class). Full suite: **21 passed**.
+
+**Why server instructions (not just docstrings):** instructions are surfaced once to the client and
+guide the whole session; docstrings guide individual tool use. Both layers reinforce the chain.
+
+**Next:** Phase 5 — eval suite (~15 scenarios, ≥90%) + live full-chain cascade test + demo video +
+README polish. (Requires a Claude Desktop restart to load all 5 tools + instructions for the live run.)
