@@ -143,3 +143,21 @@ guide the whole session; docstrings guide individual tool use. Both layers reinf
 
 **Next:** Phase 5 — eval suite (~15 scenarios, ≥90%) + live full-chain cascade test + demo video +
 README polish. (Requires a Claude Desktop restart to load all 5 tools + instructions for the live run.)
+
+### Session 6 — 2026-06-27 — Phase 5a: eval suite (the retest) + decisions
+
+**Decisions recorded** (ClickUp decision log + comment): target audience = **informatics pharmacists**
+(data/CDS-focused); FDA-aligned terminology standard (no "clean"); v1 visual = Option A data-rich
+(LLM-rendered, server stays data-only); never assert market status; **repo made PUBLIC**
+(github.com/Travis-Clement-Dev/rx-shortage-mcp, passed pre-push scan).
+
+**Done:**
+- `tests/eval_cases.py` (15 diverse drugs incl. brand + abbreviation) + `tests/test_evals.py` — runs
+  the full chain per case, scores STRUCTURAL success (normalize + pure ATC-4 class w/ ≥2 members +
+  disclaimer + valid shortage status). Expectations are stable, not drifting live status.
+- pyproject `addopts = -m 'not live'` → default suite stays offline/deterministic; eval runs with
+  `-m live`.
+- **Live eval result: 15/15 = 100%** (≥90% gate cleared). Default suite: 21 passed, 1 deselected.
+
+**Next:** Phase 5b — data-rich status visual (Option A); 5c — README polish (CDS framing, NLM
+attribution, diagram); then finalize + demo.
