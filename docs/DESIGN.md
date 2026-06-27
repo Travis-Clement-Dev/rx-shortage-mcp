@@ -75,6 +75,7 @@ RxClass/RxNorm CUIs — never model-invented.
 | Tool names `rx_`-prefixed | Avoid collisions with other drug MCP servers (e.g. Certus). |
 | Keyless-first (openFDA key optional) | Zero-signup clone-and-run. |
 | `uv`-managed env (no manual `pip install -e`) | Mixing the two corrupts the editable install (see JOURNAL). |
+| Launch via `uv run python -m rx_shortage_mcp` (+ `__main__.py`) | Official robust pattern; `uv run` re-syncs each launch. Console script kept for PyPI installs. |
 | `TypedDict`/Pydantic typed returns | Generate `outputSchema` per MCP 2025-06-18 + Anthropic guidance. |
 
 ## Build sequence
@@ -87,6 +88,6 @@ Each phase: verified before the next begins; committed atomically.
 
 ## Verification
 
-`uv run pytest` (offline fixtures) · `uv run pytest -m "not live"` · MCP Inspector
-(`npx @modelcontextprotocol/inspector uv run rx-shortage-mcp`) · live e2e on furosemide (expect
-bumetanide *also short*, torsemide *clean*) · cold-clone ≤10 min.
+`uv run --extra dev pytest` (offline; incl. `test_mcp_protocol.py` — real MCP client over stdio) ·
+MCP Inspector (`npx @modelcontextprotocol/inspector uv run python -m rx_shortage_mcp`) · live e2e on
+furosemide (expect bumetanide *also short*, torsemide *clean*) · cold-clone ≤10 min.

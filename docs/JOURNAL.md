@@ -21,9 +21,13 @@ Design reference → [`DESIGN.md`](./DESIGN.md). Per-change detail → `git log`
 
 ### Runtime (playbook #11)
 - **STDIO MCP servers must log to stderr** — never `print()` to stdout (corrupts JSON-RPC).
-- **`uv`: let `uv run`/`uv sync` own the venv.** Do NOT also run `uv pip install -e .` — the two
-  editable strategies collide and break `import` even though the `.pth` looks correct. Fix: `rm -rf
-  .venv uv.lock && uv run …` (the clean clone-and-run path).
+- **`uv`: let `uv run`/`uv sync` own the venv.** Do NOT also run `uv pip install -e .` or lean on
+  `--no-sync` — that corrupts the editable install: `src/` drops off `sys.path`, the console script
+  vanishes from `.venv/bin`, and `import`/`python -m` both fail. **Recovery: `rm -rf .venv uv.lock
+  && uv sync`.** A clean sync restores everything (import ✅, console script ✅, `src` on path ✅).
+  Claude Desktop's `uv run` re-syncs on every launch, so it self-heals.
+- **Launch via `python -m rx_shortage_mcp`** (needs `__main__.py`) — the official pattern (cf.
+  `mcp-server-git`). The `[project.scripts]` console script is kept for proper/PyPI installs.
 - **Bare `dict` returns produce no `outputSchema`.** Use `TypedDict`/Pydantic return types to get
   structured output (confirmed on `rx_health`).
 
@@ -46,10 +50,15 @@ Design reference → [`DESIGN.md`](./DESIGN.md). Per-change detail → `git log`
   and the `rx_health` tool. Smoke-tested: server loads, tool registers, annotations + `outputSchema`
   correct, runtime call works.
 
-**Gotcha hit & resolved:** mixed `uv pip install -e .` with `uv run` → broke the editable import.
-Clean rebuild fixed it; captured as a durable lesson.
+**RCA episode (systematic-debugging skill):** the MCP-over-stdio launch failed ("Failed to spawn
+rx-shortage-mcp" / "No module named rx_shortage_mcp"). Investigated boundaries instead of guessing:
+console script missing → entry_points.txt present → both direct + uv-run import failing → `src` not
+on `sys.path`. **Root cause: self-inflicted editable-install corruption** from mixing `uv pip
+install -e .`/`--no-sync` with uv's managed workflow. A clean `uv sync` fixed all of it; `src/`
+layout was never the problem. Added `__main__.py` + a permanent `tests/test_mcp_protocol.py`
+(spawns the server, drives it via a real MCP client) — **passing**.
 
-**Open / next:**
-- Phase 0 gate still needs **Travis to confirm it loads in Claude Desktop** (config in README) — I
-  can't restart his Claude Desktop. MCP Inspector check can be run locally.
-- Next: Phase 1 — `rx_check_shortage` (`openfda.py` client + tool + fixtures + tests).
+**Phase 0 status:** ✅ code-complete + verified (protocol test green). Remaining gate: **Travis to
+confirm it loads in his Claude Desktop** (config in README) — I can't restart his app.
+
+**Next:** Phase 1 — `rx_check_shortage` (`openfda.py` client + tool + fixtures + tests).

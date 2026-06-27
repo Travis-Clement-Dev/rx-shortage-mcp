@@ -60,7 +60,7 @@ All four are **read-only**. No API key required (see below).
 ```bash
 git clone <repo-url>
 cd rx-shortage-mcp
-uv run rx-shortage-mcp     # first run auto-creates the venv + installs deps
+uv run python -m rx_shortage_mcp   # first run auto-creates the venv + installs deps
 ```
 
 The server speaks MCP over stdio; you normally launch it *through* an MCP client rather than by hand.
@@ -75,7 +75,7 @@ Add to `claude_desktop_config.json`
   "mcpServers": {
     "rx-shortage": {
       "command": "uv",
-      "args": ["--directory", "/ABSOLUTE/PATH/TO/rx-shortage-mcp", "run", "rx-shortage-mcp"]
+      "args": ["--directory", "/ABSOLUTE/PATH/TO/rx-shortage-mcp", "run", "python", "-m", "rx_shortage_mcp"]
     }
   }
 }
@@ -95,8 +95,11 @@ copy `.env.example` to `.env` and set `OPENFDA_API_KEY`.
 ```bash
 uv run pytest                 # unit tests (offline, deterministic)
 uv run pytest -m "not live"   # skip tests that hit live APIs
-npx @modelcontextprotocol/inspector uv run rx-shortage-mcp   # interactive tool testing
+npx @modelcontextprotocol/inspector uv run python -m rx_shortage_mcp   # interactive tool testing
 ```
+
+> **Troubleshooting:** if `import rx_shortage_mcp` ever fails, the editable install drifted —
+> reset with `rm -rf .venv uv.lock && uv sync`. Let `uv` own the venv; don't mix in `uv pip install -e .`.
 
 ## Safety
 
