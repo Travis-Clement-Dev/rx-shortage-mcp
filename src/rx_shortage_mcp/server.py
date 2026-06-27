@@ -17,9 +17,12 @@ Tools (added across build phases):
 
 import logging
 import sys
-from typing import TypedDict
+from typing import Annotated, TypedDict
 
 from mcp.server.fastmcp import FastMCP
+from pydantic import Field
+
+from .openfda import ShortageResult, check_shortage
 
 # CRITICAL (stdio transport): stdout carries the JSON-RPC stream. A stray print()
 # to stdout corrupts it. ALL logging must go to stderr.
@@ -74,6 +77,49 @@ async def rx_health() -> HealthStatus:
         "version": __version__,
         "next_step": "Server is live. Begin a query with rx_normalize_drug.",
     }
+
+
+@mcp.tool(
+    name="rx_check_shortage",
+    annotations={
+        "title": "Check Drug Shortage Status",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def rx_check_shortage(
+    drug_name: Annotated[
+        str,
+        Field(
+            description="Generic or ingredient drug name to check, e.g. 'furosemide', 'bumetanide'. "
+            "Prefer the normalized ingredient name from rx_normalize_drug when you have one.",
+            min_length=1,
+            max_length=200,
+        ),
+    ],
+) -> ShortageResult:
+    """Check the current U.S. FDA (openFDA) shortage status of a drug.
+
+    Queries the openFDA Drug Shortages dataset by generic name and aggregates the
+    NDC/package-level records into a single status summary. National-level data only —
+    it does NOT reflect a specific pharmacy's local/regional stock.
+
+    Use this twice in the workflow: (1) to confirm the original drug is short, and
+    (2) to re-check EACH candidate alternative — an alternative may itself be in
+    shortage (the "cascade" check that is the point of this server).
+
+    Args:
+        drug_name: Generic/ingredient name (e.g. 'furosemide').
+
+    Returns:
+        ShortageResult — drug, in_shortage (bool), overall_status ('Current' /
+        'To Be Discontinued' / 'Resolved' / 'no_record'), statuses (list of
+        {status, count}), record_count, last_updated (MM/DD/YYYY or null),
+        therapeutic_categories, reasons, and next_step guidance.
+    """
+    return await check_shortage(drug_name.strip())
 
 
 def main() -> None:
