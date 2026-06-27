@@ -12,7 +12,23 @@ together**. This server does, in one LLM reasoning pass.
 > interchangeable." This tool surfaces *candidates for a licensed professional to evaluate*. It does
 > **not** check route, indication, contraindications, or therapeutic equivalence. See [Safety](#safety).
 
-> 🚧 **Status:** active build. Phase 0 (scaffold + health check) complete. Tools land across phases 1–5.
+> ✅ **Status:** v1 — all four tools live, orchestrated, and safety-gated; verified live in Claude
+> Desktop. 15/15 on the chain-success eval.
+
+---
+
+## Who it's for & what makes it different
+
+Built for **informatics pharmacists** and clinical-data teams who operationalize shortage
+response — people who care about *how the data is stitched together*, not just the answer. Every
+suggestion is grounded in real RxNorm/RxClass identifiers (no model-invented drugs) and framed as
+**clinical decision support with transparent reasoning** — a human stays in the loop; the server
+makes no substitution decision.
+
+**The gap it fills:** FDA/ASHP tell you a drug is short. Equivalence tools (Orange Book, vendor
+catalogs) tell you who else makes the *same molecule*. Neither tells you whether the *different drug
+you'd actually reach for* — a same-class alternative — is **also** in shortage. This stitches FDA
+shortage status + RxNorm/RxClass class alternatives + a per-alternative re-check into one LLM pass.
 
 ---
 
@@ -49,6 +65,28 @@ server, not a script.
 
 All four are **read-only**. No API key required (see below).
 
+## Example
+
+Ask your MCP client: *"Furosemide is on backorder — what could be considered instead, and are any of
+those also short?"* The model chains the four tools and synthesizes a ranked, shortage-flagged
+shortlist:
+
+| Same-class option (ATC C03CA) | FDA status | Presentations affected | Updated |
+|---|---|---|---|
+| furosemide (original) | Current shortage | 33 | 06/25/2026 |
+| bumetanide | Current shortage | 12 | 06/25/2026 |
+| torsemide | No shortage reported | 0 | — |
+| piretanide | No shortage reported | 0 | — |
+
+**The cascade insight:** both first-line loop diuretics — furosemide *and* its usual substitute
+bumetanide — are in current FDA shortage; torsemide is the same-class option with no shortage
+reported. *Candidates for a licensed professional to evaluate — not a substitution instruction;
+status ≠ availability, and class membership ≠ clinical interchangeability.*
+
+*(Live national data — your results will reflect current shortage status, which changes over time.)*
+
+> 🎥 Demo video: _coming soon._
+
 ## Requirements
 
 - [`uv`](https://docs.astral.sh/uv/) (recommended) — handles Python + deps automatically
@@ -81,7 +119,7 @@ Add to `claude_desktop_config.json`
 }
 ```
 
-Restart Claude Desktop, then ask: *"Atorvastatin is on backorder — what could I consider instead,
+Restart Claude Desktop, then ask: *"Furosemide is on backorder — what could I consider instead,
 and are any of those also short?"*
 
 ### Optional: openFDA API key
@@ -93,10 +131,13 @@ copy `.env.example` to `.env` and set `OPENFDA_API_KEY`.
 ## Testing
 
 ```bash
-uv run pytest                 # unit tests (offline, deterministic)
-uv run pytest -m "not live"   # skip tests that hit live APIs
+uv run --extra dev pytest        # offline unit + safety-gate + MCP-protocol tests (deterministic)
+uv run --extra dev pytest -m live # live eval: full chain over 15 drugs, asserts >=90% chain success
 npx @modelcontextprotocol/inspector uv run python -m rx_shortage_mcp   # interactive tool testing
 ```
+
+The safety gate (`tests/test_safety_gate.py`) fails the build if any tool ever frames output as a
+substitution instruction or drops the disclaimer.
 
 > **Troubleshooting:** if `import rx_shortage_mcp` ever fails, the editable install drifted —
 > reset with `rm -rf .venv uv.lock && uv sync`. Let `uv` own the venv; don't mix in `uv pip install -e .`.
