@@ -1,0 +1,36 @@
+[project]
+name = "rx-shortage-mcp"
+version = "0.1.0"
+description = "MCP server that finds therapeutic alternatives for a drug in shortage and flags which alternatives are also short (the 'cascading shortage' blind spot)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Travis Clement" }]
+keywords = ["mcp", "model-context-protocol", "drug-shortage", "rxnorm", "rxclass", "openfda", "pharmacy"]
+dependencies = [
+    "mcp>=1.27,<2",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",
+]
+
+[project.scripts]
+rx-shortage-mcp = "rx_shortage_mcp:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rx_shortage_mcp"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "live: hits live external APIs; opt-in. Deselect with -m 'not live'.",
+]
