@@ -106,3 +106,23 @@ Added the server to Claude Desktop/Code and called all 3 tools through the **rea
 3 To Be Discontinued), 5 distinct reasons ✅; `rx_normalize_drug("HCTZ")` → hydrochlorothiazide
 (exact) ✅. Structured output parsed cleanly; `next_step` hints already provide soft orchestration
 before the Phase 4 docstrings exist. **Phase 0's "loads in Claude Desktop" gate is now CLOSED.**
+
+### Session 4 — 2026-06-27 — Phase 3: `rx_get_drug_class` + `rx_find_alternatives`
+
+**Probes first:** confirmed `byDrugName` accepts a BRAND (`Lipitor`→C10AA — no pre-resolution needed);
+furosemide's ATC-4 set is `C03CA "Sulfonamides, plain"` (pure loop diuretics) vs `C03CB "...in
+combination"`; `is_combination = "combination" in className` separates them cleanly. C03CA members =
+bumetanide, piretanide, torsemide, furosemide.
+
+**Done (TDD red→green):**
+- `safety.py` — single-source `DISCLAIMER` + `FORBIDDEN_SUBSTITUTION_PHRASES` (for the Phase 4 gate).
+- `rxnav.py` `get_drug_class`: returns ALL ATC-4 classes (classId len 5), `is_combination` flagged,
+  single-ingredient first — the model picks (correction #4, surfaced not hidden).
+- `rxnav.py` `find_alternatives`: members from `drugMember[].minConcept` (correction #5), combination
+  members flagged, capped at 30, **disclaimer always attached**.
+- Both tools wired in; 6 new tests. Full suite: **17 passed**, 5 tools registered w/ outputSchema.
+
+**Live evidence:** furosemide → [C03CA pure, C03CB combo] → C03CA members [bumetanide, piretanide,
+torsemide, furosemide]. The complete data chain (normalize→class→alternatives→shortage) now exists.
+
+**Next:** Phase 4 — orchestration docstrings tying the chain together + the test-enforced safety gate.
