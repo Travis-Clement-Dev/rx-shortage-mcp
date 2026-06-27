@@ -58,7 +58,7 @@ All four are **read-only**. No API key required (see below).
 ## Install & run
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/Travis-Clement-Dev/rx-shortage-mcp.git
 cd rx-shortage-mcp
 uv run python -m rx_shortage_mcp   # first run auto-creates the venv + installs deps
 ```

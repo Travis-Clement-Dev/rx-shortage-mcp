@@ -90,4 +90,4 @@ Each phase: verified before the next begins; committed atomically.
 
 `uv run --extra dev pytest` (offline; incl. `test_mcp_protocol.py` — real MCP client over stdio) ·
 MCP Inspector (`npx @modelcontextprotocol/inspector uv run python -m rx_shortage_mcp`) · live e2e on
-furosemide (expect bumetanide *also short*, torsemide *clean*) · cold-clone ≤10 min.
+furosemide (expect bumetanide *also short*, torsemide *not listed*) · cold-clone ≤10 min.

@@ -41,7 +41,7 @@ Design reference → [`DESIGN.md`](./DESIGN.md). Per-change detail → `git log`
 - Scoped the project: portfolio-first, Claude-Desktop UX, model-decides class selection (full
   charter + decision log in ClickUp `86bamq55a`; plan approved via plan mode).
 - Verified feasibility against **live** APIs — full chain proven on furosemide (→ bumetanide also
-  Current shortage, torsemide clean). Corrected 5 draft assumptions (see lessons above).
+  Current shortage, torsemide not listed). Corrected 5 draft assumptions (see lessons above).
 - Deep market research (5 angles) — validated the cascade pain point; refined novelty (space is NOT
   empty: Certus + Orange-Book MCPs exist; whitespace = shortage→RxClass class-alts→cross-check).
 - Verified Anthropic's current MCP/agent-tool guidance → adopted `outputSchema`, token-efficient
