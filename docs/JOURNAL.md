@@ -78,3 +78,23 @@ Discontinued), updated 06/25/2026. atorvastatin → no_record. Confirms tokenize
 handling against the real API.
 
 **Next:** Phase 2 — `rx_normalize_drug` (RxNorm Prescribe + approximateTerm fallback).
+
+### Session 3 — 2026-06-27 — Phase 2: `rx_normalize_drug`
+
+**Probes first (verify-don't-assert):** confirmed brand resolution (`Lipitor`→153165) and the
+name-lookup path (`/rxcui/<cui>/property.json?propName=RxNorm Name`). Found approximate scores are a
+small opaque scale (~8.5 for a 1-char typo) → **don't hard-threshold**; surface candidates for
+confirmation instead (safer, honest).
+
+**Done (TDD red→green):**
+- `rxnav.py` `normalize_drug`: primary `Prescribe/rxcui.json?search=2` → name via property endpoint;
+  empty → `approximateTerm` candidates. Pydantic `NormalizeResult` (match_type exact/approximate/none,
+  ranked candidates, next_step) → `outputSchema`.
+- `rx_normalize_drug` tool wired in; docstring instructs the model to CONFIRM approximate matches.
+- `tests/test_normalize.py` — 5 tests (exact generic, exact brand, approximate fallback, no-match,
+  search=2). Full suite: **11 passed**.
+
+**Live evidence:** Lipitor→exact (brand); HCTZ→`hydrochlorothiazide` (abbreviation expansion!);
+`atorvastatn`→approximate w/ candidates; gibberish→none.
+
+**Next:** Phase 3 — `rx_get_drug_class` + `rx_find_alternatives` (RxClass).
