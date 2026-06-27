@@ -19,11 +19,17 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, Field
 
+from .safety import DISCLAIMER
+
 RXNAV_BASE = "https://rxnav.nlm.nih.gov/REST"
 PRESCRIBE_RXCUI_URL = f"{RXNAV_BASE}/Prescribe/rxcui.json"
 PRESCRIBE_APPROX_URL = f"{RXNAV_BASE}/Prescribe/approximateTerm.json"
+RXCLASS_BYDRUG_URL = f"{RXNAV_BASE}/rxclass/class/byDrugName.json"
+RXCLASS_MEMBERS_URL = f"{RXNAV_BASE}/rxclass/classMembers.json"
 _TIMEOUT = 15.0
 _MAX_CANDIDATES = 5
+_MAX_MEMBERS = 30
+_ATC4_ID_LEN = 5  # ATC level-4 classIds are 5 chars (e.g. 'C03CA'); shorter = ATC 1-3
 
 
 class RxNavError(RuntimeError):
@@ -126,4 +132,110 @@ async def normalize_drug(name: str) -> NormalizeResult:
         candidates=candidates,
         next_step="Approximate match only — these are best guesses. Confirm the intended drug with the user "
         "before proceeding, then call rx_get_drug_class with the confirmed name.",
+    )
+
+
+# --------------------------------------------------------------------------- #
+# RxClass: drug → pharmacologic class(es) → sibling drugs
+# --------------------------------------------------------------------------- #
+
+
+class DrugClass(BaseModel):
+    class_id: str = Field(description="ATC-4 class id, e.g. 'C03CA'.")
+    class_name: str = Field(description="ATC-4 class name, e.g. 'Sulfonamides, plain'.")
+    class_type: str = Field(description="RxClass classType (the literal 'ATC1-4' for ATC).")
+    is_combination: bool = Field(description="True if this is a combination-product class (less useful for finding single-ingredient alternatives).")
+
+
+class DrugClassResult(BaseModel):
+    drug: str = Field(description="The drug name that was queried.")
+    classes: list[DrugClass] = Field(description="All candidate ATC-4 classes, single-ingredient classes first.")
+    count: int = Field(description="Number of ATC-4 classes returned.")
+    next_step: str = Field(description="Suggested next action for the agent.")
+
+
+class DrugMember(BaseModel):
+    rxcui: str = Field(description="RxNorm concept unique identifier of the sibling drug.")
+    name: str = Field(description="Ingredient-level drug name.")
+    is_combination: bool = Field(description="True if this is a combination product (name contains '/').")
+
+
+class AlternativesResult(BaseModel):
+    class_id: str = Field(description="The ATC-4 class whose members these are.")
+    members: list[DrugMember] = Field(description="Sibling drugs in the class (candidates to evaluate, NOT substitutions).")
+    count: int = Field(description="Number of members returned (after any cap).")
+    capped: bool = Field(description="True if the class had more members than the cap and the list was truncated.")
+    disclaimer: str = Field(description="Mandatory safety disclaimer — class membership != clinical interchangeability.")
+    next_step: str = Field(description="Suggested next action for the agent.")
+
+
+def _is_combination_class(class_name: str) -> bool:
+    return "combination" in class_name.lower()
+
+
+async def get_drug_class(drug_name: str) -> DrugClassResult:
+    """Resolve a drug to its candidate ATC-4 pharmacologic classes (brand names accepted)."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        data = await _get_json(client, RXCLASS_BYDRUG_URL, {"drugName": drug_name, "relaSource": "ATC"})
+
+    items = data.get("rxclassDrugInfoList", {}).get("rxclassDrugInfo", []) or []
+    by_id: dict[str, DrugClass] = {}
+    for item in items:
+        c = item.get("rxclassMinConceptItem", {})
+        cid = c.get("classId", "")
+        if len(cid) == _ATC4_ID_LEN and cid not in by_id:  # ATC-4 only
+            name = c.get("className", "")
+            by_id[cid] = DrugClass(
+                class_id=cid,
+                class_name=name,
+                class_type=c.get("classType", ""),
+                is_combination=_is_combination_class(name),
+            )
+
+    # Single-ingredient classes first (most useful for finding alternatives), then by id.
+    classes = sorted(by_id.values(), key=lambda c: (c.is_combination, c.class_id))
+
+    if not classes:
+        next_step = (
+            "No ATC-4 class found. The drug may be a combination product without a clean single "
+            "class, or may lack an ATC mapping. Surface this ambiguity to the user rather than guessing."
+        )
+    else:
+        next_step = (
+            "Pick the single-ingredient class (is_combination=false) that matches the drug's main "
+            "therapeutic use, then call rx_find_alternatives with its class_id. Note any alternates."
+        )
+    return DrugClassResult(drug=drug_name, classes=classes, count=len(classes), next_step=next_step)
+
+
+async def find_alternatives(class_id: str) -> AlternativesResult:
+    """List the sibling drugs in an ATC-4 class. ALWAYS carries the safety disclaimer."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        data = await _get_json(client, RXCLASS_MEMBERS_URL, {"classId": class_id, "relaSource": "ATC"})
+
+    raw = data.get("drugMemberGroup", {}).get("drugMember", []) or []
+    members: list[DrugMember] = []
+    seen: set[str] = set()
+    for entry in raw:
+        mc = entry.get("minConcept", {})
+        cui = mc.get("rxcui")
+        if not cui or cui in seen:
+            continue
+        seen.add(cui)
+        name = mc.get("name", "")
+        members.append(DrugMember(rxcui=cui, name=name, is_combination="/" in name))
+
+    capped = len(members) > _MAX_MEMBERS
+    members = members[:_MAX_MEMBERS]
+    return AlternativesResult(
+        class_id=class_id,
+        members=members,
+        count=len(members),
+        capped=capped,
+        disclaimer=DISCLAIMER,
+        next_step=(
+            "For EACH member (and the original drug), call rx_check_shortage to flag which candidates "
+            "are ALSO in shortage (the cascade check). Present results as candidates to evaluate — "
+            "never as a substitution instruction. Surface the disclaimer to the user."
+        ),
     )

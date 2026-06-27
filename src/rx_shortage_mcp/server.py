@@ -23,7 +23,14 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from .openfda import ShortageResult, check_shortage
-from .rxnav import NormalizeResult, normalize_drug
+from .rxnav import (
+    AlternativesResult,
+    DrugClassResult,
+    NormalizeResult,
+    find_alternatives,
+    get_drug_class,
+    normalize_drug,
+)
 
 # CRITICAL (stdio transport): stdout carries the JSON-RPC stream. A stray print()
 # to stdout corrupts it. ALL logging must go to stderr.
@@ -162,6 +169,86 @@ async def rx_normalize_drug(
         and next_step guidance.
     """
     return await normalize_drug(name.strip())
+
+
+@mcp.tool(
+    name="rx_get_drug_class",
+    annotations={
+        "title": "Get Drug Pharmacologic Class",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def rx_get_drug_class(
+    drug_name: Annotated[
+        str,
+        Field(
+            description="Drug name (generic, ingredient, or brand — brands like 'Lipitor' work) to "
+            "look up the pharmacologic class for.",
+            min_length=1,
+            max_length=200,
+        ),
+    ],
+) -> DrugClassResult:
+    """Resolve a drug to its candidate ATC-4 pharmacologic classes (RxClass).
+
+    A drug commonly maps to SEVERAL ATC-4 classes (a pure single-ingredient class plus
+    combination-product classes). This tool returns them ALL, each flagged
+    `is_combination`, sorted single-ingredient-first. YOU choose the class: normally the
+    single-ingredient class matching the drug's main therapeutic use. Pass its `class_id`
+    to rx_find_alternatives.
+
+    Args:
+        drug_name: Drug/brand name (e.g. 'furosemide', 'Lipitor').
+
+    Returns:
+        DrugClassResult — drug, classes (list of {class_id, class_name, class_type,
+        is_combination}), count, and next_step guidance.
+    """
+    return await get_drug_class(drug_name.strip())
+
+
+@mcp.tool(
+    name="rx_find_alternatives",
+    annotations={
+        "title": "Find Same-Class Candidate Drugs",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def rx_find_alternatives(
+    class_id: Annotated[
+        str,
+        Field(
+            description="An ATC-4 class id from rx_get_drug_class, e.g. 'C03CA'.",
+            min_length=1,
+            max_length=20,
+        ),
+    ],
+) -> AlternativesResult:
+    """List the sibling drugs in an ATC-4 pharmacologic class (RxClass members).
+
+    These are CANDIDATE alternatives for a licensed professional to evaluate — NOT a
+    substitution instruction. Same-class membership does NOT imply clinical
+    interchangeability (route, indication, contraindications, dosing, and equivalence are
+    not checked; some members may be withdrawn or combination products). Every response
+    carries a `disclaimer` that you MUST surface to the user.
+
+    After calling this, re-check EACH member's supply with rx_check_shortage to flag the
+    ones that are also short (the cascade check).
+
+    Args:
+        class_id: ATC-4 class id (e.g. 'C03CA').
+
+    Returns:
+        AlternativesResult — class_id, members (list of {rxcui, name, is_combination}),
+        count, capped (bool), disclaimer (mandatory), and next_step guidance.
+    """
+    return await find_alternatives(class_id.strip())
 
 
 def main() -> None:
