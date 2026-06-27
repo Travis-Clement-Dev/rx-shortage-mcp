@@ -172,3 +172,18 @@ attribution, diagram); then finalize + demo.
   real-shortage example query.
 - **v1 feature-complete:** 5 tools + orchestration + test-enforced safety gate; 21 offline tests +
   live eval 15/15; public repo (17 commits). **Remaining:** Travis records the demo video → mark complete.
+
+### Session 7 — 2026-06-27 — Blind test #1 + record_count fix
+
+**Blind test #1** (methylphenidate, run in a fresh chat; criteria pre-registered in ClickUp): **PASS
+(6/6, 0 red flags).** Proactive, uncued cascade + safety framing held; the model reasoned
+"active-ingredient shortage ⇒ class-wide" and flagged the modafinil "same class ≠ interchangeable"
+trap on live data; cross-class non-stimulants were named only as a disclosed, *unverified* limitation
+(grounding discipline held under pressure).
+
+**Finding → fix (playbook #23 — test as the user hits it):** the blind test exposed that
+`record_count` was floored at our `limit=50` (amphetamine family all returned exactly 50). A real
+correctness bug our offline fixtures (all <50 records) structurally could not catch. Fix: `limit=1000`
+(openFDA max) to fetch all NDC records, surface openFDA `meta.results.total` as `record_count`, add a
+`capped` flag. Verified live: lisdexamfetamine **108** (was 50), amphetamine/dextroamphetamine 73;
+per-status counts now true. Regression test added; 22 offline tests + eval 15/15.
