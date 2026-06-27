@@ -31,6 +31,7 @@ packages = ["src/rx_shortage_mcp"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+addopts = "-m 'not live'"
 markers = [
-    "live: hits live external APIs; opt-in. Deselect with -m 'not live'.",
+    "live: hits live external APIs; opt-in. Run the eval with -m live.",
 ]
