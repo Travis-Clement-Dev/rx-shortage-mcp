@@ -41,7 +41,36 @@ logging.basicConfig(
 )
 logger = logging.getLogger("rx_shortage_mcp")
 
-mcp = FastMCP("rx_shortage_mcp")
+INSTRUCTIONS = """\
+rx_shortage_mcp answers a pharmacist's question: "Drug X is on shortage — what could be
+considered instead, and are any of those also short?"
+
+WORKFLOW — chain these tools in order:
+1. rx_normalize_drug(name) — resolve the user's input to a clean RxNorm name/RxCUI. If
+   match_type is 'approximate', CONFIRM the intended drug with the user before continuing.
+2. rx_check_shortage(name) — confirm the original drug's current shortage status (context).
+3. rx_get_drug_class(name) — get the drug's ATC-4 classes. Choose the single-ingredient
+   class (is_combination=false) that matches its main therapeutic use; note alternates. If
+   it maps to several classes or only combination classes, surface that ambiguity.
+4. rx_find_alternatives(class_id) — list the sibling drugs in that class.
+5. For EACH sibling AND the original drug, call rx_check_shortage — this is the cascade
+   check: a candidate alternative may itself be in shortage.
+6. Synthesize a ranked shortlist of CANDIDATE alternatives, each flagged if it is also
+   currently short. Rank by class proximity and shortage status only.
+
+SAFETY — non-negotiable:
+- This is DECISION SUPPORT, not a substitution authority. Same pharmacologic class does NOT
+  mean clinically interchangeable: route, indication, contraindications, dosing equivalence,
+  and therapeutic equivalence are NOT checked here.
+- Present results only as "candidate alternatives for a licensed professional to evaluate,"
+  framed for evaluation — never as a directive to swap one drug for another.
+- Always surface the disclaimer returned by rx_find_alternatives to the user.
+- Only ever name drugs returned by these tools (real RxNorm/RxClass concepts). NEVER invent
+  or suggest a drug from your own knowledge.
+- Shortage data is national-level only and does not reflect local stock.
+"""
+
+mcp = FastMCP("rx_shortage_mcp", instructions=INSTRUCTIONS)
 
 
 class HealthStatus(TypedDict):
