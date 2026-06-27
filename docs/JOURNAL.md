@@ -62,3 +62,19 @@ layout was never the problem. Added `__main__.py` + a permanent `tests/test_mcp_
 confirm it loads in his Claude Desktop** (config in README) — I can't restart his app.
 
 **Next:** Phase 1 — `rx_check_shortage` (`openfda.py` client + tool + fixtures + tests).
+
+### Session 2 — 2026-06-27 — Phase 1: `rx_check_shortage`
+
+**Done (TDD: red → green):**
+- `openfda.py` — tokenized `generic_name` search; NOT_FOUND→`no_record`; NDC-level records
+  aggregated by status (severity-ordered); optional `OPENFDA_API_KEY`; Pydantic `ShortageResult`
+  (token-efficient summary, not raw records) → `outputSchema`.
+- `rx_check_shortage` tool wired in (Annotated input → flat inputSchema; read-only/idempotent/openWorld).
+- `tests/test_shortage.py` — 5 tests locking the corrections (tokenized search, aggregation,
+  NOT_FOUND, resolved-not-active, api_key). Full suite: **6 passed**.
+
+**Live evidence:** furosemide → in_shortage=True, Current, 33 records (30 Current + 3 To Be
+Discontinued), updated 06/25/2026. atorvastatin → no_record. Confirms tokenized search + 200/404
+handling against the real API.
+
+**Next:** Phase 2 — `rx_normalize_drug` (RxNorm Prescribe + approximateTerm fallback).
