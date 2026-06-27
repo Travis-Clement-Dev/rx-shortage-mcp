@@ -64,6 +64,7 @@ async def test_current_shortage_aggregates_by_status():
     assert counts == {"Current": 2, "To Be Discontinued": 1}
     assert res.last_updated == "06/25/2026"  # most recent across records
     assert res.therapeutic_categories == ["Cardiovascular"]
+    assert res.capped is False  # meta total (3) == fetched (3)
 
 
 @respx.mock
@@ -90,6 +91,7 @@ async def test_search_is_tokenized_not_quoted():
     url = str(route.calls[0].request.url)
     assert "generic_name" in url and "furosemide" in url
     assert "%22" not in url  # no double-quotes → tokenized, not a phrase (correction #1)
+    assert "limit=1000" in url  # fetch all records so counts aren't capped
 
 
 @respx.mock
@@ -98,3 +100,23 @@ async def test_api_key_added_when_env_set(monkeypatch):
     route = respx.get(OPENFDA_SHORTAGES_URL).mock(return_value=Response(200, json=CURRENT_PAYLOAD))
     await check_shortage("furosemide")
     assert "api_key=testkey123" in str(route.calls[0].request.url)
+
+
+# Regression for the blind-test finding: record_count must be the true openFDA meta total,
+# not the (capped) number of fetched records.
+CAPPED_PAYLOAD = {
+    "meta": {"results": {"total": 80}},
+    "results": [
+        {"generic_name": "Widely Short Drug", "status": "Current", "update_date": "06/22/2026"},
+        {"generic_name": "Widely Short Drug", "status": "Current", "update_date": "06/20/2026"},
+    ],
+}
+
+
+@respx.mock
+async def test_record_count_uses_meta_total_not_fetched_length():
+    respx.get(OPENFDA_SHORTAGES_URL).mock(return_value=Response(200, json=CAPPED_PAYLOAD))
+    res = await check_shortage("widely short drug")
+    assert res.record_count == 80  # true total from meta, not len(results)=2
+    assert res.capped is True  # more records exist than were fetched
+    assert res.in_shortage is True

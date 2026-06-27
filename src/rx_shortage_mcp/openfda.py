@@ -21,7 +21,9 @@ from pydantic import BaseModel, Field
 
 OPENFDA_SHORTAGES_URL = "https://api.fda.gov/drug/shortages.json"
 _TIMEOUT = 15.0
-_DEFAULT_LIMIT = 50
+# openFDA caps `limit` at 1000/request. Fetch all NDC-level records for a drug so the breadth
+# count AND the per-status counts are TRUE totals, not capped (no real drug has >1000 records).
+_DEFAULT_LIMIT = 1000
 
 # An "active" shortage is Current or To Be Discontinued. Severity orders the summary.
 _SEVERITY = {"Current": 3, "To Be Discontinued": 2, "Resolved": 1}
@@ -44,7 +46,8 @@ class ShortageResult(BaseModel):
     in_shortage: bool = Field(description="True if any record is actively short (Current or To Be Discontinued).")
     overall_status: str = Field(description="Most severe status across records, or 'no_record' if none found.")
     statuses: list[StatusCount] = Field(description="Distinct statuses with their record counts.")
-    record_count: int = Field(description="Number of shortage records returned for this drug.")
+    record_count: int = Field(description="True total of NDC/package-level shortage records (openFDA meta total).")
+    capped: bool = Field(description="True only if more records exist than were fetched (very rare; total > 1000).")
     last_updated: str | None = Field(description="Most recent record update date (MM/DD/YYYY), or null.")
     therapeutic_categories: list[str] = Field(description="Distinct therapeutic categories across the records.")
     reasons: list[str] = Field(description="Distinct shortage reasons across the records.")
@@ -67,7 +70,7 @@ def _parse_date(value: str | None) -> datetime:
         return datetime.min
 
 
-async def _fetch_records(drug_name: str, *, limit: int = _DEFAULT_LIMIT) -> list[dict]:
+async def _fetch_records(drug_name: str, *, limit: int = _DEFAULT_LIMIT) -> tuple[list[dict], int]:
     params: dict[str, Any] = {"search": f"generic_name:{drug_name}", "limit": limit}
     api_key = os.environ.get("OPENFDA_API_KEY")
     if api_key:
@@ -80,14 +83,16 @@ async def _fetch_records(drug_name: str, *, limit: int = _DEFAULT_LIMIT) -> list
     if isinstance(data, dict) and "error" in data:
         code = data["error"].get("code")
         if code == "NOT_FOUND":
-            return []
+            return [], 0
         raise OpenFDAError(data["error"].get("message", f"openFDA error: {code}"))
     if resp.status_code >= 400:
         raise OpenFDAError(f"openFDA HTTP {resp.status_code}")
-    return data.get("results", [])
+    results = data.get("results", [])
+    total = data.get("meta", {}).get("results", {}).get("total", len(results))
+    return results, total
 
 
-def _summarize(drug_name: str, records: list[dict]) -> ShortageResult:
+def _summarize(drug_name: str, records: list[dict], total: int) -> ShortageResult:
     if not records:
         return ShortageResult(
             drug=drug_name,
@@ -95,6 +100,7 @@ def _summarize(drug_name: str, records: list[dict]) -> ShortageResult:
             overall_status="no_record",
             statuses=[],
             record_count=0,
+            capped=False,
             last_updated=None,
             therapeutic_categories=[],
             reasons=[],
@@ -133,7 +139,8 @@ def _summarize(drug_name: str, records: list[dict]) -> ShortageResult:
         in_shortage=in_shortage,
         overall_status=overall_status,
         statuses=statuses,
-        record_count=len(records),
+        record_count=total,
+        capped=total > len(records),
         last_updated=last_updated,
         therapeutic_categories=categories,
         reasons=reasons,
@@ -143,5 +150,5 @@ def _summarize(drug_name: str, records: list[dict]) -> ShortageResult:
 
 async def check_shortage(drug_name: str) -> ShortageResult:
     """Look up and aggregate the openFDA shortage status for ``drug_name``."""
-    records = await _fetch_records(drug_name)
-    return _summarize(drug_name, records)
+    records, total = await _fetch_records(drug_name)
+    return _summarize(drug_name, records, total)
