@@ -23,6 +23,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from .openfda import ShortageResult, check_shortage
+from .rxnav import NormalizeResult, normalize_drug
 
 # CRITICAL (stdio transport): stdout carries the JSON-RPC stream. A stray print()
 # to stdout corrupts it. ALL logging must go to stderr.
@@ -120,6 +121,47 @@ async def rx_check_shortage(
         therapeutic_categories, reasons, and next_step guidance.
     """
     return await check_shortage(drug_name.strip())
+
+
+@mcp.tool(
+    name="rx_normalize_drug",
+    annotations={
+        "title": "Normalize Drug Name to RxCUI",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def rx_normalize_drug(
+    name: Annotated[
+        str,
+        Field(
+            description="A messy drug name to normalize: brand ('Lipitor'), generic, salt form "
+            "('morphine sulfate'), abbreviation ('HCTZ'), or a typo. ",
+            min_length=1,
+            max_length=200,
+        ),
+    ],
+) -> NormalizeResult:
+    """Normalize a messy drug name/brand/typo to an RxNorm RxCUI and clean name.
+
+    This is the FIRST step of the workflow. It uses RxNorm's prescribable search
+    (exact-then-normalized), falling back to approximate matching for typos.
+
+    IMPORTANT: if `match_type` is 'approximate', the result is a best guess — present
+    the `candidates` to the user and confirm the intended drug before proceeding. Do
+    not silently assume the top candidate is correct.
+
+    Args:
+        name: The drug name as the user typed it.
+
+    Returns:
+        NormalizeResult — found (bool), rxcui, name (resolved RxNorm name), match_type
+        ('exact' / 'approximate' / 'none'), candidates (ranked, for approximate matches),
+        and next_step guidance.
+    """
+    return await normalize_drug(name.strip())
 
 
 def main() -> None:
