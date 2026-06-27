@@ -98,3 +98,11 @@ confirmation instead (safer, honest).
 `atorvastatn`→approximate w/ candidates; gibberish→none.
 
 **Next:** Phase 3 — `rx_get_drug_class` + `rx_find_alternatives` (RxClass).
+
+### Integration checkpoint — 2026-06-27 — live MCP smoke test in Claude Desktop
+
+Added the server to Claude Desktop/Code and called all 3 tools through the **real MCP connection**
+(not pytest): `rx_health` ✅; `rx_check_shortage("furosemide")` → Current, 33 records (30 Current +
+3 To Be Discontinued), 5 distinct reasons ✅; `rx_normalize_drug("HCTZ")` → hydrochlorothiazide
+(exact) ✅. Structured output parsed cleanly; `next_step` hints already provide soft orchestration
+before the Phase 4 docstrings exist. **Phase 0's "loads in Claude Desktop" gate is now CLOSED.**
